@@ -6,3 +6,7 @@ node_modules/
 
 # Operating-system clutter
 .DS_Store
+
+# Customer accounts: password hashes, sessions and drafts. NEVER commit these
+accounts-data.json
+accounts-data.json.tmp
