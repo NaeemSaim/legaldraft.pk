@@ -267,6 +267,19 @@ test('the verify endpoint signs in on success and gives nothing away afterwards'
   assert.deepStrictEqual(again, { ok: true, alreadyVerified: true })
 })
 
+test('a name cannot inject markup into the password reset email', () => {
+  const { resetHtml } = require('../mailer.js')
+  const html = resetHtml('<a href="https://evil.example">Click</a>', 'https://legaldraft.pk/#/reset?token=x')
+  assert.ok(!html.includes('evil.example">'))
+  assert.ok(html.includes('&lt;a href=&quot;https://evil.example&quot;&gt;Click&lt;/a&gt;'))
+})
+
+test('a very long name is refused at signup', () => {
+  const made = accounts.createAccount('longname@example.com', 'password123', 'x'.repeat(101))
+  assert.strictEqual(made.ok, false)
+  assert.strictEqual(accounts.findByEmail('longname@example.com'), null)
+})
+
 test('a damaged accounts file stops the app and is not overwritten', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'legaldraft-damaged-'))
   const file = path.join(dir, 'accounts-data.json')

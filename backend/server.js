@@ -916,7 +916,6 @@ app.post('/api/signup', async (req, res) => {
   const sent = await sendVerificationEmail(
     check.email,
     created.verifyCode,
-    name,
     accounts.FREE_TRIAL_CREDITS,
     accounts.VERIFY_CODE_MINUTES
   )
@@ -965,7 +964,6 @@ app.post('/api/resend-verification', async (req, res) => {
   const sent = await sendVerificationEmail(
     result.account.email,
     result.verifyCode,
-    result.account.name,
     accounts.FREE_TRIAL_CREDITS,
     accounts.VERIFY_CODE_MINUTES
   )
@@ -982,7 +980,9 @@ app.post('/api/forgot-password', async (req, res) => {
 
   let devLink
   if (result.account && result.token) {
-    const sent = await sendPasswordResetEmail(result.account.email, result.token, result.account.name)
+    // An unverified account's name is unproven: its owner may not own this inbox.
+    const name = result.account.verified ? result.account.name : null
+    const sent = await sendPasswordResetEmail(result.account.email, result.token, name)
     if (!sent.delivered) devLink = sent.link
   }
 

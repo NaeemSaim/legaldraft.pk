@@ -44,15 +44,26 @@ function getTransporter() {
   return transporter
 }
 
-function verificationHtml(name, code, freeCredits, minutes) {
-  const greeting = name ? `Assalam-o-Alaikum ${name},` : 'Assalam-o-Alaikum,'
+// Account names are typed by whoever signs up, so they never go into HTML raw.
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// No name here: anyone can sign up with someone else's address, so this email
+// can reach a stranger and must not carry text chosen by the person signing up.
+function verificationHtml(code, freeCredits, minutes) {
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f7f9fc;font-family:Segoe UI,Arial,sans-serif;color:#0f1c2e;">
   <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e3e8ef;border-radius:14px;padding:32px;">
     <div style="font-size:20px;font-weight:800;margin-bottom:24px;">
       LegalDraft<span style="color:#b8873b;">.pk</span>
     </div>
-    <p style="margin:0 0 14px;">${greeting}</p>
+    <p style="margin:0 0 14px;">Assalam-o-Alaikum,</p>
     <p style="margin:0 0 20px;line-height:1.6;color:#4a5a70;">
       Enter this code on LegalDraft.pk to activate your account.
       ${freeCredits ? `Once confirmed, <strong>${freeCredits} free credits</strong> will be added to your account.` : ''}
@@ -66,7 +77,7 @@ function verificationHtml(name, code, freeCredits, minutes) {
 </body></html>`
 }
 
-async function sendVerificationEmail(to, code, name, freeCredits, minutes) {
+async function sendVerificationEmail(to, code, freeCredits, minutes) {
   const tx = getTransporter()
 
   if (!tx) {
@@ -84,7 +95,7 @@ async function sendVerificationEmail(to, code, name, freeCredits, minutes) {
       from: FROM,
       to,
       subject: `${code} is your LegalDraft.pk verification code`,
-      html: verificationHtml(name, code, freeCredits, minutes),
+      html: verificationHtml(code, freeCredits, minutes),
       text: `Your LegalDraft.pk verification code is ${code}\n\nThis code expires in ${minutes} minutes. Never share it with anyone.`,
     })
     return { ok: true, delivered: true }
@@ -99,7 +110,7 @@ function resetUrl(token) {
 }
 
 function resetHtml(name, link) {
-  const greeting = name ? `Assalam-o-Alaikum ${name},` : 'Assalam-o-Alaikum,'
+  const greeting = name ? `Assalam-o-Alaikum ${escapeHtml(name)},` : 'Assalam-o-Alaikum,'
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f7f9fc;font-family:Segoe UI,Arial,sans-serif;color:#0f1c2e;">
   <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e3e8ef;border-radius:14px;padding:32px;">
@@ -156,6 +167,7 @@ async function sendPasswordResetEmail(to, token, name) {
 module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail,
+  resetHtml,
   smtpConfigured,
   resetUrl,
 }

@@ -37,6 +37,7 @@ const VERIFY_MAX_ATTEMPTS = 5      // wrong guesses before a code stops working
 const VERIFY_RESEND_SECONDS = 60   // minimum gap between codes
 const VERIFY_MAX_SENDS_PER_HOUR = 5
 const SESSION_DAYS = 60            // how long a login lasts
+const MAX_NAME_LENGTH = 100
 
 const PACKAGES = [
   { id: 'single', credits: 1, bonus: 0, label: 'Single document' },
@@ -200,6 +201,9 @@ function createAccount(email, password, name) {
   const fullName = String(name || '').trim()
   if (fullName.length < 2) {
     return { ok: false, error: 'Please enter your full name.' }
+  }
+  if (fullName.length > MAX_NAME_LENGTH) {
+    return { ok: false, error: `Please keep your name to ${MAX_NAME_LENGTH} characters.` }
   }
 
   const id = randomId('ld')
