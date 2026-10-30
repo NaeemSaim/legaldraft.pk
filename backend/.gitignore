@@ -1,0 +1,8 @@
+# Downloaded parts — never commit these, they can be reinstalled
+node_modules/
+
+# Secret keys and environment settings — NEVER commit these
+.env
+
+# Operating-system clutter
+.DS_Store
