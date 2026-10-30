@@ -2,10 +2,12 @@
 // Sign up, log in, and email verification screens.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from './auth-context.jsx'
 import { signup, verifyEmail, resendVerification, forgotPassword, resetPassword } from './auth-client.js'
 import { BUSINESS } from './pages.jsx'
+
+const RESEND_SECONDS = 60
 
 function AuthShell({ title, subtitle, children, footer }) {
   return (
@@ -60,32 +62,12 @@ export function SignUp() {
 
   if (sent) {
     return (
-      <AuthShell
-        title="Check your inbox"
-        subtitle={`We have sent a verification link to ${sent.email}. Click it to activate your account and receive your ${BUSINESS.freeTrialCredits} free credits.`}
-      >
-        <div className="callout">
-          <p style={{ margin: 0 }}>
-            The link expires in 48 hours. If it does not arrive within a few minutes, check your spam
-            folder, or <a href="#/resend">request a new link</a>.
-          </p>
-        </div>
-
-        {/* Shown only while email sending is not configured, so you can test. */}
-        {sent.devLink ? (
-          <div className="callout callout-warn">
-            <strong>Email sending is not configured.</strong>
-            <p style={{ marginBottom: 0 }}>
-              Use this link to verify (visible because SMTP is not set up):{' '}
-              <a href={sent.devLink}>{sent.devLink}</a>
-            </p>
-          </div>
-        ) : null}
-
-        <a className="btn btn-ghost auth-btn" href="#/login">
-          Go to sign in
-        </a>
-      </AuthShell>
+      <VerifyCodeForm
+        initialEmail={sent.email}
+        justSent
+        emailFailed={sent.emailFailed}
+        initialDevCode={sent.devCode}
+      />
     )
   }
 
@@ -204,7 +186,7 @@ export function LogIn() {
       {error ? <p className="error-msg">{error}</p> : null}
       {unverified ? (
         <p className="auth-fine">
-          <a href="#/resend">Resend the verification link</a>
+          <a href={verifyPath(unverified)}>Enter your verification code</a>
         </p>
       ) : null}
       <p className="auth-fine">
@@ -218,113 +200,167 @@ export function LogIn() {
   )
 }
 
-// --- verify (the link target) ----------------------------------------------
+// --- verify (enter the emailed code) ----------------------------------------
 
-export function Verify() {
-  const [state, setState] = useState({ status: 'working' })
-  const requested = useRef(false)
+const verifyPath = (email) => `#/verify?email=${encodeURIComponent(email)}`
+
+// `justSent` starts the resend cooldown, because a code has only just gone out.
+function VerifyCodeForm({ initialEmail, justSent, emailFailed, initialDevCode }) {
+  const { reload } = useAuth()
+  const [email, setEmail] = useState(initialEmail || '')
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [error, setError] = useState(emailFailed ? 'We could not send your code. Please use Resend code below.' : '')
+  const [notice, setNotice] = useState('')
+  const [devCode, setDevCode] = useState(initialDevCode || '')
+  const [cooldown, setCooldown] = useState(justSent ? RESEND_SECONDS : 0)
+  const [done, setDone] = useState(null)
 
   useEffect(() => {
-    // Only once: a second call would report "already verified" on a first click.
-    if (requested.current) return
-    requested.current = true
+    if (cooldown <= 0) return undefined
+    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [cooldown])
 
-    // The token arrives as #/verify?token=xxxx
-    const hash = window.location.hash
-    const q = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : ''
-    const token = new URLSearchParams(q).get('token') || ''
-
-    if (!token) {
-      setState({ status: 'error', message: 'This verification link is incomplete.' })
+  async function submit() {
+    if (!email.trim()) {
+      setError('Please enter your email address.')
       return
     }
-
-    verifyEmail(token)
-      .then((res) => setState({ status: 'done', ...res }))
-      .catch((err) => setState({ status: 'error', message: err.message }))
-  }, [])
-
-  if (state.status === 'working') {
-    return <AuthShell title="Verifying your email…" subtitle="One moment please." />
+    if (code.length !== 6) {
+      setError('Please enter the 6-digit code.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await verifyEmail(email.trim(), code)
+      if (res.token) await reload()
+      setDone(res)
+    } catch (err) {
+      setError(err.message)
+      setCode('')
+    } finally {
+      setBusy(false)
+    }
   }
 
-  if (state.status === 'error') {
+  async function resend() {
+    if (!email.trim()) {
+      setError('Please enter your email address.')
+      return
+    }
+    setResending(true)
+    setError('')
+    setNotice('')
+    try {
+      const res = await resendVerification(email.trim())
+      setDevCode(res.devCode || '')
+      setCode('')
+      setNotice('A new code has been sent. Any earlier code no longer works.')
+      setCooldown(RESEND_SECONDS)
+    } catch (err) {
+      setError(err.message)
+      if (err.data && err.data.retryAfter) setCooldown(err.data.retryAfter)
+    } finally {
+      setResending(false)
+    }
+  }
+
+  if (done) {
+    if (done.alreadyVerified) {
+      return (
+        <AuthShell title="Already verified" subtitle="This email was already confirmed. You can sign in.">
+          <a className="btn btn-primary auth-btn" href="#/login">Sign in to start drafting</a>
+        </AuthShell>
+      )
+    }
     return (
-      <AuthShell title="We could not verify that link" subtitle={state.message}>
-        <a className="btn btn-primary auth-btn" href="#/resend">Request a new link</a>
+      <AuthShell
+        title="Email verified"
+        subtitle={`Your account is active and ${done.credits} free credits have been added.`}
+      >
+        <a className="btn btn-primary auth-btn" href="#/draft">Start drafting</a>
       </AuthShell>
     )
   }
 
   return (
     <AuthShell
-      title={state.alreadyVerified ? 'Already verified' : 'Email verified'}
+      title="Enter your verification code"
       subtitle={
-        state.alreadyVerified
-          ? 'This email was already confirmed. You can sign in.'
-          : `Your account is active and ${state.credits} free credits have been added.`
+        initialEmail
+          ? `Enter the 6-digit code we sent to ${initialEmail} to activate your account and receive your ${BUSINESS.freeTrialCredits} free credits.`
+          : `Enter the 6-digit code we emailed you to activate your account and receive your ${BUSINESS.freeTrialCredits} free credits.`
       }
+      footer={<a href="#/login">Back to sign in</a>}
     >
-      <a className="btn btn-primary auth-btn" href="#/login">Sign in to start drafting</a>
+      {initialEmail ? null : (
+        <>
+          <label className="field-label" htmlFor="vc-email">Email address</label>
+          <input
+            id="vc-email"
+            type="email"
+            className="field-input auth-input"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setError('') }}
+          />
+        </>
+      )}
+
+      <label className="field-label" htmlFor="vc-code">Verification code</label>
+      <input
+        id="vc-code"
+        className="field-input auth-input auth-code-input"
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        autoFocus={Boolean(initialEmail)}
+        value={code}
+        onChange={(e) => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError('') }}
+        onKeyDown={(e) => e.key === 'Enter' && submit()}
+        placeholder="000000"
+      />
+
+      {error ? <p className="error-msg">{error}</p> : null}
+      {notice ? <p className="auth-fine">{notice}</p> : null}
+
+      {/* Shown only while email sending is not configured, so you can test. */}
+      {devCode ? (
+        <div className="callout callout-warn">
+          <strong>Email sending is not configured.</strong>
+          <p style={{ marginBottom: 0 }}>
+            Use this code to verify (visible because SMTP is not set up): <strong>{devCode}</strong>
+          </p>
+        </div>
+      ) : null}
+
+      <button className="btn btn-primary auth-btn" type="button" onClick={submit} disabled={busy}>
+        {busy ? 'Verifying…' : 'Verify email'}
+      </button>
+      <button
+        className="btn btn-ghost auth-btn"
+        type="button"
+        onClick={resend}
+        disabled={resending || cooldown > 0}
+      >
+        {resending ? 'Sending…' : cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+      </button>
+
+      <p className="auth-fine">
+        The code expires in 15 minutes. If it does not arrive within a few minutes, check your spam folder.
+      </p>
     </AuthShell>
   )
 }
 
-// --- resend verification ---------------------------------------------------
-
-export function ResendVerification() {
-  const [email, setEmail] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [done, setDone] = useState(null)
-
-  async function submit() {
-    if (!email.trim()) return
-    setBusy(true)
-    setError('')
-    try {
-      const res = await resendVerification(email.trim())
-      setDone(res)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (done) {
-    return (
-      <AuthShell title="Link sent" subtitle="Please check your inbox for the new verification link.">
-        {done.devLink ? (
-          <div className="callout callout-warn">
-            <strong>Email sending is not configured.</strong>
-            <p style={{ marginBottom: 0 }}>
-              <a href={done.devLink}>{done.devLink}</a>
-            </p>
-          </div>
-        ) : null}
-        <a className="btn btn-ghost auth-btn" href="#/login">Back to sign in</a>
-      </AuthShell>
-    )
-  }
-
-  return (
-    <AuthShell title="Resend verification link" subtitle="Enter the email you signed up with.">
-      <label className="field-label" htmlFor="rs-email">Email address</label>
-      <input
-        id="rs-email"
-        type="email"
-        className="field-input auth-input"
-        value={email}
-        onChange={(e) => { setEmail(e.target.value); setError('') }}
-        onKeyDown={(e) => e.key === 'Enter' && submit()}
-      />
-      {error ? <p className="error-msg">{error}</p> : null}
-      <button className="btn btn-primary auth-btn" type="button" onClick={submit} disabled={busy}>
-        {busy ? 'Sending…' : 'Send new link'}
-      </button>
-    </AuthShell>
-  )
+// The page reached from sign in: #/verify?email=xxxx
+export function Verify() {
+  const hash = window.location.hash
+  const q = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : ''
+  return <VerifyCodeForm initialEmail={new URLSearchParams(q).get('email') || ''} />
 }
 
 // --- gate: wraps any page that requires a signed-in, verified account -------
@@ -357,9 +393,9 @@ export function RequireAuth({ children }) {
     return (
       <AuthShell
         title="Please verify your email"
-        subtitle={`We sent a verification link to ${account.email}. Click it to activate your account.`}
+        subtitle={`Enter the code we sent to ${account.email} to activate your account.`}
       >
-        <a className="btn btn-primary auth-btn" href="#/resend">Resend the link</a>
+        <a className="btn btn-primary auth-btn" href={verifyPath(account.email)}>Enter your code</a>
       </AuthShell>
     )
   }

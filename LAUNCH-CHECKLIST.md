@@ -54,7 +54,7 @@ it — Contact, Pricing, Privacy, Terms, Refund.
 - [ ] `.env` is NOT in git (`.gitignore` covers it)
 - [ ] `ADMIN_TOKEN` is long and random — it guards credit granting
 - [ ] `ANTHROPIC_API_KEY` is set in the host's environment, never in a file in git
-- [ ] `PUBLIC_URL` points at your live front end, or verification links will be wrong
+- [ ] `PUBLIC_URL` points at your live front end, or password-reset links will be wrong
 - [ ] `ALLOWED_ORIGINS` set to your real domain(s) in production
 - [ ] `TRUST_PROXY_HOPS` set for your host. Check it: from two different networks
       (e.g. phone data and home wifi), fail a login 11 times on one. It must block
@@ -64,7 +64,7 @@ it — Contact, Pricing, Privacy, Terms, Refund.
 
 ## 4. Email
 
-Verification and password-reset links must actually arrive.
+Verification codes and password-reset links must actually arrive.
 
 - [ ] `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` set
 - [ ] Gmail requires an **App Password**, not your normal password
@@ -120,4 +120,4 @@ Not blockers, but be aware:
   revision** from a partial one. Have a practitioner check them.
 - **One account per person** is stated in the Terms but only lightly enforced.
   Email aliases (`name+1@gmail.com`) are blocked; different real addresses are not.
-- **No automated payment gateway** — approvals are manual through `#/admin`.
+- **No automated payment gateway** — approvals are manual through `#/admin`.

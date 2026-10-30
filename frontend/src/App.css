@@ -682,6 +682,7 @@ textarea.field-input { min-height: 150px; resize: vertical; line-height: 1.7; }
 .auth-card .field-label { margin-bottom: 6px; }
 .auth-btn { width: 100%; margin-top: 6px; }
 .auth-btn + .auth-btn { margin-top: 10px; }
+.auth-code-input { text-align: center; font-size: 1.4rem; letter-spacing: .4em; font-variant-numeric: tabular-nums; }
 .auth-fine { font-size: .84rem; color: var(--muted); margin: 16px 0 0; line-height: 1.55; }
 .auth-footer { text-align: center; margin-top: 20px; color: var(--slate); font-size: .93rem; }
 .auth-card .callout { margin: 0 0 20px; }

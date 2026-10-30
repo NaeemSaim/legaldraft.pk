@@ -898,8 +898,8 @@ function adminOk(req) {
 // Authentication
 // ---------------------------------------------------------------------------
 
-// Sign up. Creates an UNVERIFIED account and emails the verification link.
-// No credits are granted until that link is clicked.
+// Sign up. Creates an UNVERIFIED account and emails the verification code.
+// No credits are granted until that code is entered.
 app.post('/api/signup', async (req, res) => {
   if (!rateLimit('signup:' + clientIp(req), 5, 60 * 60 * 1000)) {
     return res.status(429).json({ error: 'Too many signup attempts. Please try again later.' })
@@ -915,49 +915,62 @@ app.post('/api/signup', async (req, res) => {
 
   const sent = await sendVerificationEmail(
     check.email,
-    created.verifyToken,
+    created.verifyCode,
     name,
-    accounts.FREE_TRIAL_CREDITS
+    accounts.FREE_TRIAL_CREDITS,
+    accounts.VERIFY_CODE_MINUTES
   )
 
   res.json({
     ok: true,
     email: check.email,
-    // In development (no SMTP) the link is returned so you can click it.
-    devLink: sent.delivered ? undefined : sent.link,
-    message: 'Please check your inbox and click the verification link to activate your account.',
+    // The account exists either way, so the screen offers a resend instead.
+    emailFailed: !sent.ok || undefined,
+    // In development (no SMTP) the code is returned so you can enter it.
+    devCode: sent.delivered ? undefined : sent.code,
+    message: 'Please check your inbox and enter the verification code to activate your account.',
   })
 })
 
-// Click target for the verification link.
+// Checks the emailed code. On success the customer is signed in straight away.
 app.post('/api/verify', (req, res) => {
-  const token = (req.body && req.body.token) || ''
-  const result = accounts.verifyEmail(token)
+  if (!rateLimit('verify:' + clientIp(req), 30, 15 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many attempts. Please try again in a few minutes.' })
+  }
+  const { email, code } = req.body || {}
+  const result = accounts.verifyEmail(email, code)
   if (!result.ok) return res.status(400).json({ error: result.error, expired: result.expired })
+  // No code is needed to reach the alreadyVerified answer, so it carries no account details.
+  if (result.alreadyVerified) return res.json({ ok: true, alreadyVerified: true })
   res.json({
     ok: true,
-    alreadyVerified: Boolean(result.alreadyVerified),
+    alreadyVerified: false,
     email: result.account.email,
     credits: result.account.balance,
+    token: result.sessionToken,
   })
 })
 
-// Resend the verification link.
+// Resend the verification code.
 app.post('/api/resend-verification', async (req, res) => {
   if (!rateLimit('resend:' + clientIp(req), 5, 60 * 60 * 1000)) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' })
   }
   const { email } = req.body || {}
-  const result = accounts.refreshVerifyToken(email)
-  if (!result.ok) return res.status(400).json({ error: result.error })
+  const result = accounts.refreshVerifyCode(email)
+  if (!result.ok) {
+    return res.status(result.retryAfter ? 429 : 400).json({ error: result.error, retryAfter: result.retryAfter })
+  }
 
   const sent = await sendVerificationEmail(
     result.account.email,
-    result.verifyToken,
+    result.verifyCode,
     result.account.name,
-    accounts.FREE_TRIAL_CREDITS
+    accounts.FREE_TRIAL_CREDITS,
+    accounts.VERIFY_CODE_MINUTES
   )
-  res.json({ ok: true, devLink: sent.delivered ? undefined : sent.link })
+  if (!sent.ok) return res.status(502).json({ error: sent.error })
+  res.json({ ok: true, devCode: sent.delivered ? undefined : sent.code })
 })
 
 app.post('/api/forgot-password', async (req, res) => {
@@ -1359,4 +1372,4 @@ const PORT = process.env.PORT || 3001
 
 app.listen(PORT, () => {
   console.log(`✅ LegalDraft.pk backend running on http://localhost:${PORT}`)
-})
+})

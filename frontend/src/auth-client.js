@@ -56,8 +56,11 @@ export function signup(email, password, name) {
   return post('/api/signup', { email, password, name })
 }
 
-export function verifyEmail(token) {
-  return post('/api/verify', { token })
+// A correct code also signs the customer in.
+export async function verifyEmail(email, code) {
+  const data = await post('/api/verify', { email, code })
+  if (data.token) setToken(data.token)
+  return data
 }
 
 export function resendVerification(email) {
@@ -192,4 +195,4 @@ export async function adminRejectPayment(adminToken, id, reason) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || 'Could not reject.')
   return data
-}
+}

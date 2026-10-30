@@ -32,11 +32,11 @@ const DRAFT = {
 
 function makeAccount(email, credits) {
   const made = accounts.createAccount(email, 'password123', 'Test User')
-  accounts.verifyEmail(made.verifyToken)
+  accounts.verifyEmail(email, made.verifyCode)
   const current = 2 // free trial credits
   if (credits !== current) accounts.adminAdjustBalance(made.account.id, credits - current, 'test')
   const signedIn = accounts.login(email, 'password123')
-  return { id: made.account.id, token: signedIn.sessionToken, verifyToken: made.verifyToken }
+  return { id: made.account.id, token: signedIn.sessionToken }
 }
 
 const balanceOf = (email) => accounts.findByEmail(email).balance
@@ -161,14 +161,110 @@ test('an upload named .html is stored with an image extension', async () => {
   assert.strictEqual(path.extname(stored[0]), '.png')
 })
 
-test('clicking a verification link twice says already verified', () => {
+test('entering a verification code twice says already verified', () => {
   const made = accounts.createAccount('twice@example.com', 'password123', 'Test User')
-  const first = accounts.verifyEmail(made.verifyToken)
-  const second = accounts.verifyEmail(made.verifyToken)
+  const first = accounts.verifyEmail('twice@example.com', made.verifyCode)
+  const second = accounts.verifyEmail('twice@example.com', made.verifyCode)
   assert.strictEqual(first.ok, true)
   assert.ok(!first.alreadyVerified)
+  assert.ok(accounts.accountFromSession(first.sessionToken))
   assert.strictEqual(second.alreadyVerified, true)
+  assert.ok(!second.sessionToken)
   assert.strictEqual(accounts.findByEmail('twice@example.com').balance, 2)
+})
+
+const wrongCodeFor = (code) => (code === '000000' ? '000001' : '000000')
+
+test('a verification code is not stored in plain text', () => {
+  const made = accounts.createAccount('hashed@example.com', 'password123', 'Test User')
+  assert.match(made.verifyCode, /^\d{6}$/)
+  assert.ok(!fs.readFileSync(DATA_FILE, 'utf8').includes(`"${made.verifyCode}"`))
+})
+
+test('a verification code stops working after five wrong attempts', () => {
+  const email = 'guesser@example.com'
+  const made = accounts.createAccount(email, 'password123', 'Test User')
+  for (let i = 0; i < 4; i++) {
+    const wrong = accounts.verifyEmail(email, wrongCodeFor(made.verifyCode))
+    assert.strictEqual(wrong.ok, false)
+    assert.ok(!wrong.expired)
+  }
+  assert.strictEqual(accounts.verifyEmail(email, wrongCodeFor(made.verifyCode)).expired, true)
+  assert.strictEqual(accounts.verifyEmail(email, made.verifyCode).ok, false)
+  assert.strictEqual(accounts.findByEmail(email).balance, 0)
+})
+
+test('a badly formatted code does not use up an attempt', () => {
+  const email = 'format@example.com'
+  const made = accounts.createAccount(email, 'password123', 'Test User')
+  for (let i = 0; i < 10; i++) accounts.verifyEmail(email, 'abc')
+  const spaced = made.verifyCode.slice(0, 3) + ' ' + made.verifyCode.slice(3)
+  assert.strictEqual(accounts.verifyEmail(email, spaced).ok, true)
+})
+
+test('an expired verification code is refused', () => {
+  const email = 'expired@example.com'
+  const made = accounts.createAccount(email, 'password123', 'Test User')
+  const db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'))
+  db.accounts[made.account.id].verifyExpires = new Date(Date.now() - 1000).toISOString()
+  fs.writeFileSync(DATA_FILE, JSON.stringify(db))
+  const result = accounts.verifyEmail(email, made.verifyCode)
+  assert.strictEqual(result.ok, false)
+  assert.strictEqual(result.expired, true)
+})
+
+test('resending a code waits for the cooldown, replaces the old code and is capped per hour', () => {
+  const email = 'resend@example.com'
+  const made = accounts.createAccount(email, 'password123', 'Test User')
+  const tooSoon = accounts.refreshVerifyCode(email)
+  assert.strictEqual(tooSoon.ok, false)
+  assert.ok(tooSoon.retryAfter > 0)
+
+  const age = (minutes) => {
+    const db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'))
+    const acct = db.accounts[made.account.id]
+    acct.verifySends = acct.verifySends.map((at) => new Date(new Date(at).getTime() - minutes * 60000).toISOString())
+    fs.writeFileSync(DATA_FILE, JSON.stringify(db))
+  }
+
+  age(2)
+  const fresh = accounts.refreshVerifyCode(email)
+  assert.strictEqual(fresh.ok, true)
+  if (fresh.verifyCode !== made.verifyCode) {
+    assert.strictEqual(accounts.verifyEmail(email, made.verifyCode).ok, false)
+  }
+
+  for (let i = 0; i < 3; i++) {
+    age(2)
+    assert.strictEqual(accounts.refreshVerifyCode(email).ok, true)
+  }
+  age(2)
+  const capped = accounts.refreshVerifyCode(email)
+  assert.strictEqual(capped.ok, false)
+  assert.ok(capped.retryAfter > 60)
+})
+
+test('the verify endpoint signs in on success and gives nothing away afterwards', async () => {
+  const email = 'endpoint@example.com'
+  const made = accounts.createAccount(email, 'password123', 'Test User')
+  const post = (body) =>
+    fetch(API + '/api/verify', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+  assert.strictEqual((await post({ email, code: wrongCodeFor(made.verifyCode) })).status, 400)
+  assert.strictEqual((await post({ email: 'nobody@example.com', code: '123456' })).status, 400)
+
+  const ok = await post({ email, code: made.verifyCode })
+  const body = await ok.json()
+  assert.strictEqual(ok.status, 200)
+  assert.strictEqual(body.credits, 2)
+  assert.ok(accounts.accountFromSession(body.token))
+
+  const again = await (await post({ email, code: '' })).json()
+  assert.deepStrictEqual(again, { ok: true, alreadyVerified: true })
 })
 
 test('a damaged accounts file stops the app and is not overwritten', () => {

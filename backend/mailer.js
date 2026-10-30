@@ -7,13 +7,13 @@
 //     SMTP_USER=you@gmail.com
 //     SMTP_PASS=your-app-password
 //     MAIL_FROM="LegalDraft.pk <you@gmail.com>"
-//     PUBLIC_URL=https://legaldraft.pk        (used to build the link)
+//     PUBLIC_URL=https://legaldraft.pk        (used to build reset links)
 //
 // For Gmail you must use an App Password, not your normal password.
 //
-// IF SMTP IS NOT CONFIGURED the link is printed to the backend console instead
+// IF SMTP IS NOT CONFIGURED the code or link is printed to the backend console instead
 // of being emailed. That lets you develop and test the whole signup flow before
-// setting up an email provider — just copy the link from the terminal.
+// setting up an email provider — just copy it from the terminal.
 // ---------------------------------------------------------------------------
 
 let nodemailer = null
@@ -44,11 +44,7 @@ function getTransporter() {
   return transporter
 }
 
-function verifyUrl(token) {
-  return `${PUBLIC_URL.replace(/\/$/, '')}/#/verify?token=${encodeURIComponent(token)}`
-}
-
-function verificationHtml(name, link, freeCredits) {
+function verificationHtml(name, code, freeCredits, minutes) {
   const greeting = name ? `Assalam-o-Alaikum ${name},` : 'Assalam-o-Alaikum,'
   return `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f7f9fc;font-family:Segoe UI,Arial,sans-serif;color:#0f1c2e;">
@@ -58,46 +54,38 @@ function verificationHtml(name, link, freeCredits) {
     </div>
     <p style="margin:0 0 14px;">${greeting}</p>
     <p style="margin:0 0 20px;line-height:1.6;color:#4a5a70;">
-      Please confirm your email address to activate your LegalDraft.pk account.
+      Enter this code on LegalDraft.pk to activate your account.
       ${freeCredits ? `Once confirmed, <strong>${freeCredits} free credits</strong> will be added to your account.` : ''}
     </p>
-    <p style="margin:0 0 26px;">
-      <a href="${link}" style="display:inline-block;background:#0f1c2e;color:#fff;text-decoration:none;padding:13px 26px;border-radius:9px;font-weight:600;">
-        Confirm my email
-      </a>
-    </p>
-    <p style="margin:0 0 8px;font-size:13px;color:#718096;">
-      Or paste this link into your browser:
-    </p>
-    <p style="margin:0 0 24px;font-size:12px;color:#1a4f8a;word-break:break-all;">${link}</p>
+    <p style="margin:0 0 26px;font-size:32px;font-weight:800;letter-spacing:8px;">${code}</p>
     <p style="margin:0;font-size:12px;color:#718096;border-top:1px solid #eef2f7;padding-top:16px;">
-      This link expires in 48 hours. If you did not create this account, you can ignore this email.
+      This code expires in ${minutes} minutes. Never share it with anyone. If you did not create
+      this account, you can ignore this email.
     </p>
   </div>
 </body></html>`
 }
 
-async function sendVerificationEmail(to, token, name, freeCredits) {
-  const link = verifyUrl(token)
+async function sendVerificationEmail(to, code, name, freeCredits, minutes) {
   const tx = getTransporter()
 
   if (!tx) {
     // Development fallback — no SMTP configured.
     console.log('\n' + '='.repeat(72))
-    console.log('  EMAIL NOT CONFIGURED — verification link for', to)
-    console.log('  ' + link)
+    console.log('  EMAIL NOT CONFIGURED — verification code for', to)
+    console.log('  ' + code)
     console.log('  (Set SMTP_* in .env to send real emails)')
     console.log('='.repeat(72) + '\n')
-    return { ok: true, delivered: false, link }
+    return { ok: true, delivered: false, code }
   }
 
   try {
     await tx.sendMail({
       from: FROM,
       to,
-      subject: 'Confirm your email — LegalDraft.pk',
-      html: verificationHtml(name, link, freeCredits),
-      text: `Please confirm your email address to activate your LegalDraft.pk account:\n\n${link}\n\nThis link expires in 48 hours.`,
+      subject: `${code} is your LegalDraft.pk verification code`,
+      html: verificationHtml(name, code, freeCredits, minutes),
+      text: `Your LegalDraft.pk verification code is ${code}\n\nThis code expires in ${minutes} minutes. Never share it with anyone.`,
     })
     return { ok: true, delivered: true }
   } catch (err) {
@@ -169,6 +157,5 @@ module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail,
   smtpConfigured,
-  verifyUrl,
   resetUrl,
-}
+}
