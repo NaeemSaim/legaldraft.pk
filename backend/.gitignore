@@ -10,3 +10,4 @@ node_modules/
 # Customer accounts: password hashes, sessions and drafts. NEVER commit these
 accounts-data.json
 accounts-data.json.tmp
+credits-data.json
