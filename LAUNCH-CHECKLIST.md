@@ -37,14 +37,9 @@ your evidence.
 `frontend/src/pages.jsx`, the `BUSINESS` block at the top. Every page reads from
 it — Contact, Pricing, Privacy, Terms, Refund.
 
-- [ ] `email` — a real, monitored support inbox (currently `support@legaldraft.pk`)
-- [ ] `phone` — currently a placeholder `+92 300 0000000`
-- [ ] `address`
-- [ ] `payment.easypaisa`, `payment.jazzcash` — currently placeholders
-- [ ] `payment.bankName`, `bankTitle`, `bankAccount` — currently `PK00XXXX…`
-- [ ] `effectiveDate` on the policies
-
-**Nobody can pay you until the payment details are real.**
+- [ ] Create and monitor the `support@`, `refund@`, `feedback@` and `privacy@legaldraft.pk` inboxes
+- [x] `payment.easypaisa`, `payment.jazzcash`, `payment.accountName`
+- [x] `effectiveDate` on the policies
 
 ---
 

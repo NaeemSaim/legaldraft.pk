@@ -2,7 +2,7 @@
 // Static site pages: landing, about, contact and the legal policies.
 //
 // BEFORE YOU GO LIVE, edit the BUSINESS constant below — every page reads its
-// company name, email, phone, address and effective date from this one place.
+// company name, email, jurisdiction and effective date from this one place.
 // ---------------------------------------------------------------------------
 
 import { useState } from 'react'
@@ -16,9 +16,8 @@ export const BUSINESS = {
   refundEmail: 'refund@legaldraft.pk',      // refund requests
   feedbackEmail: 'feedback@legaldraft.pk',  // template corrections & suggestions
   privacyEmail: 'privacy@legaldraft.pk',    // privacy & data requests
-  phone: '+92 300 0000000',
-  address: 'Sargodha, Punjab, Pakistan',
-  effectiveDate: '1 August 2026',
+  jurisdiction: 'Sargodha, Punjab, Pakistan',  // courts named in the Terms
+  effectiveDate: '1 November 2026',
 
   // --- Pricing -------------------------------------------------------------
   // One credit = one generated document.
@@ -27,13 +26,11 @@ export const BUSINESS = {
   freeTrialCredits: 2,          // must match FREE_TRIAL_CREDITS in accounts.js
   refundWindowDays: 7,          // for UNUSED credits only
 
-  // Where customers send money. Fill these in before going live.
+  // Where customers send money.
   payment: {
-    easypaisa: '0300-0000000',
-    jazzcash: '0300-0000000',
-    bankName: 'Your Bank',
-    bankTitle: 'LegalDraft.pk',
-    bankAccount: 'PK00XXXX0000000000000000',
+    easypaisa: '03126893512',
+    jazzcash: '03126893512',
+    accountName: 'Naeem Asghar',
   },
 }
 
@@ -395,7 +392,6 @@ function PaymentProofForm({ onSubmitted }) {
           >
             <option>EasyPaisa</option>
             <option>JazzCash</option>
-            <option>Bank transfer</option>
           </select>
         </div>
       </div>
@@ -540,20 +536,18 @@ export function Pricing() {
         <div className="pay-grid">
           <div className="pay-card">
             <h4>EasyPaisa</h4>
-            <p>{p.easypaisa}</p>
+            <p>
+              {p.easypaisa}
+              <br />
+              {p.accountName}
+            </p>
           </div>
           <div className="pay-card">
             <h4>JazzCash</h4>
-            <p>{p.jazzcash}</p>
-          </div>
-          <div className="pay-card">
-            <h4>Bank transfer</h4>
             <p>
-              {p.bankName}
+              {p.jazzcash}
               <br />
-              {p.bankTitle}
-              <br />
-              <span className="mono">{p.bankAccount}</span>
+              {p.accountName}
             </p>
           </div>
         </div>
@@ -694,16 +688,6 @@ export function Contact() {
           <p>{BUSINESS.email}</p>
           <span className="contact-hint">Usually answered within two working days</span>
         </a>
-        <div className="contact-card">
-          <h3>Phone / WhatsApp</h3>
-          <p>{BUSINESS.phone}</p>
-          <span className="contact-hint">Working hours, Monday to Saturday</span>
-        </div>
-        <div className="contact-card">
-          <h3>Address</h3>
-          <p>{BUSINESS.address}</p>
-          <span className="contact-hint">Correspondence by appointment</span>
-        </div>
       </div>
       <Prose>
         <h2>Reporting a problem with a draft</h2>
@@ -751,9 +735,8 @@ export function Privacy() {
           </li>
           <li>
             <strong>Billing information.</strong> The credits granted and spent on your account, and
-            the payment reference you send us. Payments are made directly to our bank or
-            mobile-wallet accounts &mdash; we never see or store your card, wallet PIN or banking
-            credentials.
+            the payment reference you send us. Payments are made directly to our mobile-wallet
+            accounts &mdash; we never see or store your card, wallet PIN or banking credentials.
           </li>
           <li>
             <strong>Technical information</strong> such as browser type, device type and approximate
@@ -836,7 +819,7 @@ export function Privacy() {
 
         <h2>11. Contact</h2>
         <p>
-          {BUSINESS.legalName}, {BUSINESS.address} &mdash;{' '}
+          {BUSINESS.legalName} &mdash;{' '}
           <a href={`mailto:${BUSINESS.privacyEmail}`}>{BUSINESS.privacyEmail}</a>
         </p>
       </Prose>
@@ -973,7 +956,7 @@ export function Terms() {
         <h2>9. Governing law</h2>
         <p>
           These terms are governed by the laws of the Islamic Republic of Pakistan, and the courts at{' '}
-          {BUSINESS.address} shall have jurisdiction.
+          {BUSINESS.jurisdiction} shall have jurisdiction.
         </p>
 
         <h2>10. Contact</h2>
