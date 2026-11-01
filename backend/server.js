@@ -8,7 +8,7 @@ const cors = require('cors')
 const Anthropic = require('@anthropic-ai/sdk')
 const { TEMPLATES } = require('./templates')
 const accounts = require('./accounts.js')
-const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require('./mailer.js')
+const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured, emailDevMode } = require('./mailer.js')
 const multer = require('multer')
 const fsp = require('fs')
 const pathMod = require('path')
@@ -925,7 +925,7 @@ app.post('/api/signup', async (req, res) => {
     email: check.email,
     // The account exists either way, so the screen offers a resend instead.
     emailFailed: !sent.ok || undefined,
-    // In development (no SMTP) the code is returned so you can enter it.
+    // Only with EMAIL_DEV_MODE (no SMTP) is the code returned so you can enter it.
     devCode: sent.delivered ? undefined : sent.code,
     message: 'Please check your inbox and enter the verification code to activate your account.',
   })
@@ -1372,4 +1372,7 @@ const PORT = process.env.PORT || 3001
 
 app.listen(PORT, () => {
   console.log(`✅ LegalDraft.pk backend running on http://localhost:${PORT}`)
+  if (!smtpConfigured() && !emailDevMode()) {
+    console.warn('⚠️  SMTP is not configured. Verification codes and password reset links cannot be sent.')
+  }
 })

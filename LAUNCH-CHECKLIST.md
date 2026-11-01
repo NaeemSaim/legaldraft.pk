@@ -70,8 +70,10 @@ Verification codes and password-reset links must actually arrive.
 - [ ] Gmail requires an **App Password**, not your normal password
 - [ ] Send yourself a test signup and confirm the email lands (check spam)
 
-Until SMTP is configured, links are printed to the backend console and shown on
-screen. That is fine for testing and **not** acceptable once real users sign up.
+Until SMTP is configured, nobody can finish signing up or reset a password. For
+local testing without email, set `EMAIL_DEV_MODE=true`. **Never set it on the live
+server:** it shows reset links on screen, so anyone could take over any account.
+Also set `NODE_ENV=production` on the live server, which makes it ignored.
 
 ---
 

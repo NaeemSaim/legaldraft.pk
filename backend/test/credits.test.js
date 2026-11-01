@@ -293,3 +293,80 @@ test('a damaged accounts file stops the app and is not overwritten', () => {
   fs.rmSync(dir, { recursive: true, force: true })
   assert.ok(fs.existsSync(DATA_FILE))
 })
+
+// Runs a second server with email unconfigured. SMTP is blanked so .env cannot
+// send real mail, and blank values stop dotenv filling them back in.
+async function forgotPasswordWith(env, port, email) {
+  const child = spawn(process.execPath, ['server.js'], {
+    cwd: BACKEND,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      PORT: String(port),
+      ANTHROPIC_API_KEY: 'test-key',
+      TRUST_PROXY_HOPS: '0',
+      SMTP_HOST: '',
+      SMTP_USER: '',
+      SMTP_PASS: '',
+      NODE_ENV: '',
+      EMAIL_DEV_MODE: '',
+      ...env,
+    },
+  })
+  try {
+    const url = `http://127.0.0.1:${port}`
+    for (let i = 0; i < 50; i++) {
+      try {
+        await fetch(url + '/api/health')
+        break
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+    }
+    const res = await fetch(url + '/api/forgot-password', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    return { status: res.status, body: await res.json() }
+  } finally {
+    child.kill()
+  }
+}
+
+test('without SMTP a password reset link is never shown to the requester', async () => {
+  makeAccount('noreveal@example.com', 0)
+  const { status, body } = await forgotPasswordWith({}, 3979, 'noreveal@example.com')
+  assert.strictEqual(status, 200)
+  assert.strictEqual(body.devLink, undefined)
+  assert.ok(!JSON.stringify(body).includes('token='))
+})
+
+test('email dev mode is ignored in production', async () => {
+  makeAccount('noreveal-prod@example.com', 0)
+  const { body } = await forgotPasswordWith(
+    { EMAIL_DEV_MODE: 'true', NODE_ENV: 'production' },
+    3980,
+    'noreveal-prod@example.com'
+  )
+  assert.strictEqual(body.devLink, undefined)
+})
+
+test('email dev mode shows the reset link for local testing', async () => {
+  makeAccount('dev-link@example.com', 0)
+  const { body } = await forgotPasswordWith({ EMAIL_DEV_MODE: 'true' }, 3981, 'dev-link@example.com')
+  assert.match(body.devLink, /#\/reset\?token=/)
+})
+
+test('without SMTP a verification code is reported as failed and not returned', async () => {
+  const { sendVerificationEmail } = require('../mailer.js')
+  const saved = { ...process.env }
+  Object.assign(process.env, { SMTP_HOST: '', SMTP_USER: '', SMTP_PASS: '', EMAIL_DEV_MODE: '', NODE_ENV: '' })
+  try {
+    const sent = await sendVerificationEmail('noreveal@example.com', '123456', 2, 30)
+    assert.strictEqual(sent.ok, false)
+    assert.strictEqual(sent.code, undefined)
+  } finally {
+    process.env = saved
+  }
+})

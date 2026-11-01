@@ -11,9 +11,12 @@
 //
 // For Gmail you must use an App Password, not your normal password.
 //
-// IF SMTP IS NOT CONFIGURED the code or link is printed to the backend console instead
-// of being emailed. That lets you develop and test the whole signup flow before
-// setting up an email provider — just copy it from the terminal.
+// IF SMTP IS NOT CONFIGURED nothing is sent and the request reports a failure.
+//
+// For local development only, set EMAIL_DEV_MODE=true. The code or link is then
+// printed to the backend console and returned to the browser, so you can test the
+// whole signup flow without an email provider. Anyone holding a reset link can take
+// over that account, so this is opt-in and is ignored when NODE_ENV=production.
 // ---------------------------------------------------------------------------
 
 let nodemailer = null
@@ -28,6 +31,10 @@ const PUBLIC_URL = process.env.PUBLIC_URL || 'http://localhost:5173'
 
 function smtpConfigured() {
   return Boolean(nodemailer && process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+}
+
+function emailDevMode() {
+  return process.env.EMAIL_DEV_MODE === 'true' && process.env.NODE_ENV !== 'production'
 }
 
 let transporter = null
@@ -81,6 +88,10 @@ async function sendVerificationEmail(to, code, freeCredits, minutes) {
   const tx = getTransporter()
 
   if (!tx) {
+    if (!emailDevMode()) {
+      console.error('Could not send verification email: SMTP is not configured.')
+      return { ok: false, error: 'Could not send the verification email. Please try again shortly.' }
+    }
     // Development fallback — no SMTP configured.
     console.log('\n' + '='.repeat(72))
     console.log('  EMAIL NOT CONFIGURED — verification code for', to)
@@ -142,6 +153,10 @@ async function sendPasswordResetEmail(to, token, name) {
   const tx = getTransporter()
 
   if (!tx) {
+    if (!emailDevMode()) {
+      console.error('Could not send reset email: SMTP is not configured.')
+      return { ok: false, error: 'Could not send the reset email. Please try again shortly.' }
+    }
     console.log('\n' + '='.repeat(72))
     console.log('  EMAIL NOT CONFIGURED — password reset link for', to)
     console.log('  ' + link)
@@ -169,5 +184,6 @@ module.exports = {
   sendPasswordResetEmail,
   resetHtml,
   smtpConfigured,
+  emailDevMode,
   resetUrl,
 }
