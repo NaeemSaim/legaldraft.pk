@@ -1,0 +1,7 @@
+[Unit]
+Description=LegalDraft.pk data backup
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/legaldraft/backup.env
+ExecStart=/opt/legaldraft/deploy/backup.sh

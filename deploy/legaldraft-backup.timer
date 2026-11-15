@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly LegalDraft.pk data backup
+
+[Timer]
+# 21:30 UTC = 02:30 in Pakistan, when nobody is drafting.
+OnCalendar=*-*-* 21:30:00 UTC
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

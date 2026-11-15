@@ -1,0 +1,2 @@
+# Shell scripts and server config must keep Unix line endings, or they fail on Linux.
+deploy/** text eol=lf

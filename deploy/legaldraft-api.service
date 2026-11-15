@@ -1,0 +1,28 @@
+[Unit]
+Description=LegalDraft.pk API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=legaldraft
+Group=legaldraft
+WorkingDirectory=/opt/legaldraft/backend
+EnvironmentFile=/etc/legaldraft/api.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+
+# The app may only write to its data directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/legaldraft
+
+[Install]
+WantedBy=multi-user.target

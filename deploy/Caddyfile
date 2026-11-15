@@ -1,0 +1,23 @@
+# Installed to /etc/caddy/Caddyfile by setup-server.sh, which fills in the
+# domain. Caddy gets and renews the HTTPS certificate by itself; it needs the
+# DNS record to point here and ports 80 and 443 open.
+#
+# Caddy replaces any X-Forwarded-For header the client sends with the real
+# address, which is what makes TRUST_PROXY_HOPS=1 safe.
+
+__API_DOMAIN__ {
+	encode gzip
+
+	# Payment screenshots are capped at 6 MB by the app.
+	request_body {
+		max_size 8MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:3001
+}

@@ -16,7 +16,11 @@ files on the server:
 every redeploy and every restart.** Without the step below you would lose every
 customer account and all payment evidence, silently.
 
-Fix it one of two ways:
+**Using the Oracle setup in `deploy/`? This is already handled:** data lives in
+`/var/lib/legaldraft` on the VM's own disk and is backed up nightly. Follow
+`deploy/README.md`, including step 7 (off-server backups), then skip to section 2.
+
+Otherwise, fix it one of two ways:
 
 **a) Persistent disk (simplest)**
 1. In Render: Service → Disks → Add Disk, mount path `/var/data`.
